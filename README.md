@@ -1,7 +1,9 @@
 # NESO calibration
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
-[![Actions Status][actions-badge]][actions-link]
+[![Tests](https://github.com/UCL/neso-calibration/actions/workflows/tests.yml/badge.svg)](https://github.com/UCL/neso-calibration/actions/workflows/tests.yml)
+[![Linting](https://github.com/UCL/neso-calibration/actions/workflows/linting.yml/badge.svg)](https://github.com/UCL/neso-calibration/actions/workflows/linting.yml)
+[![Documentation](https://github.com/UCL/neso-calibration/actions/workflows/docs.yml/badge.svg)](https://github-pages.ucl.ac.uk/neso-calibration/)
 [![Licence][licence-badge]](./LICENCE.md)
 
 <!-- prettier-ignore-start -->
