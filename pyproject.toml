@@ -1,0 +1,172 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools",
+    "setuptools-scm",
+]
+
+[project]
+authors = [
+    {email = "arc.collaborations@ucl.ac.uk", name = "UCL ARC"},
+]
+classifiers = [
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Typing :: Typed",
+]
+dependencies = [
+    "h5py",
+    "numpy",
+]
+description = "A cookieninja template with ARC recommendations."
+dynamic = [
+    "version",
+]
+keywords = [
+]
+name = "nesopy"
+optional-dependencies = {dev = [
+    "black",
+    "build",
+    "mypy",
+    "pre-commit",
+    "pytest",
+    "ruff",
+    "tox>=4",
+    "twine",
+]}
+readme = "README.md"
+requires-python = ">=3.10"
+license.file = "LICENCE.md"
+urls.homepage = "https://github.com/UCL/neso-calibration"
+
+[tool.coverage]
+report = {skip_covered = true, sort = "cover"}
+run = {branch = true, parallel = true, source = [
+    "nesopy",
+]}
+paths.source = [
+    "src",
+    ".tox*/*/lib/python*/site-packages",
+]
+
+[tool.mypy]
+explicit_package_bases = true
+plugins = [
+    "numpy.typing.mypy_plugin",
+    "pydantic.mypy",
+]
+
+[tool.pytest.ini_options]
+addopts = "--color=yes -v"
+testpaths = [
+    "tests",
+]
+
+[tool.ruff]
+fix = true
+force-exclude = true
+ignore = [
+    "D203", # no-blank-line-before-class
+    "D212", # multi-line-summary-first-line
+    "D417", # argument description in docstring (unreliable)
+    "RET505", # superfluous else return,
+]
+per-file-ignores = {"test_*" = [
+    "D103",
+    "S101",
+]}
+select = [
+    "A",
+    "ARG",
+    "B",
+    "BLE",
+    "C",
+    "COM",
+    "D",
+    "DJ",
+    "DTZ",
+    "E",
+    "EM",
+    "ERA",
+    "EXE",
+    "F",
+    "FBT",
+    "I",
+    "ICN",
+    "ISC",
+    "N",
+    "NPY",
+    "PD",
+    "PGH",
+    "PIE",
+    "PL",
+    "PT",
+    "PTH",
+    "PYI",
+    "Q",
+    "RET",
+    "RSE",
+    "RUF",
+    "S",
+    "SIM",
+    "T",
+    "TCH",
+    "TID",
+    "UP",
+    "W",
+    "YTT",
+]
+target-version = "py310"
+isort.known-first-party = [
+    "nesopy",
+]
+mccabe.max-complexity = 18
+pep8-naming.classmethod-decorators = [
+    "classmethod",
+    "pydantic.validator",
+]
+pydocstyle.convention = "google"
+pylint.max-args = 10
+
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+write_to = "src/nesopy/_version.py"
+
+[tool.tomlsort]
+all = true
+spaces_indent_inline_array = 4
+trailing_comma_inline_array = true
+overrides."project.classifiers".inline_arrays = false
+overrides."tool.coverage.paths.source".inline_arrays = false
+
+[tool.tox]
+legacy_tox_ini = """
+    [gh-actions]
+    python =
+        3.10: py310
+        3.11: py311
+
+    [testenv]
+    commands =
+        pytest --cov
+    deps =
+        pytest
+        pytest-cov
+
+    [testenv:docs]
+    commands =
+        sphinx-apidoc -o docs src/ -T
+        sphinx-build -W -b html docs docs/_build/html
+    deps =
+        sphinx<7
+        sphinx_rtd_theme
+
+    [tox]
+    env_list =
+        py310
+        py311
+"""
