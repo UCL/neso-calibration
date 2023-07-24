@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nesopy package &mdash; nesopy 0.1.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Welcome to nesopy’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            nesopy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">nesopy package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-nesopy.model">nesopy.model module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#nesopy.model.AbstractModel"><code class="docutils literal notranslate"><span class="pre">AbstractModel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#nesopy.model.AbstractModel.__init__"><code class="docutils literal notranslate"><span class="pre">AbstractModel.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#nesopy.model.AbstractModel.__call__"><code class="docutils literal notranslate"><span class="pre">AbstractModel.__call__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#nesopy.model.NativeModel"><code class="docutils literal notranslate"><span class="pre">NativeModel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#nesopy.model.NativeModel.__init__"><code class="docutils literal notranslate"><span class="pre">NativeModel.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#nesopy.model.NativeModel.__call__"><code class="docutils literal notranslate"><span class="pre">NativeModel.__call__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#nesopy.model.DockerModel"><code class="docutils literal notranslate"><span class="pre">DockerModel</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#nesopy.model.DockerModel.__init__"><code class="docutils literal notranslate"><span class="pre">DockerModel.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#nesopy.model.DockerModel.__call__"><code class="docutils literal notranslate"><span class="pre">DockerModel.__call__()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-nesopy.output">nesopy.output module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#nesopy.output.read_hdf5_datasets"><code class="docutils literal notranslate"><span class="pre">read_hdf5_datasets()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nesopy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">nesopy package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/nesopy.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-nesopy">
+<span id="nesopy-package"></span><h1>nesopy package<a class="headerlink" href="#module-nesopy" title="Permalink to this heading"></a></h1>
+<p>NESO Python interface.</p>
+<section id="module-nesopy.model">
+<span id="nesopy-model-module"></span><h2>nesopy.model module<a class="headerlink" href="#module-nesopy.model" title="Permalink to this heading"></a></h2>
+<p>Wrappers for NESO models.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="nesopy.model.AbstractModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nesopy.model.</span></span><span class="sig-name descname"><span class="pre">AbstractModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">solver_executable_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_session_file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh_file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extract_outputs_function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">CompletedProcess</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_omp_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_mpi_processes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mpirun_options</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/nesopy/model.html#AbstractModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.model.AbstractModel" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Base class for wrappers for executing a NESO solver and extracting outputs.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nesopy.model.AbstractModel.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">solver_executable_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_session_file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh_file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extract_outputs_function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">CompletedProcess</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_omp_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_mpi_processes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mpirun_options</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/nesopy/model.html#AbstractModel.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.model.AbstractModel.__init__" title="Permalink to this definition"></a></dt>
+<dd><p>Create a new NESO model wrapper instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>solver_executable_path</strong> – Path to NESO solver executable to use.</p></li>
+<li><p><strong>base_session_file_path</strong> – Path to XML file defining bae NESO configuration.
+Parameters values defined in this file are used as defaults unless
+overridden by <cite>parameter_overrides</cite> keyword arguments when calling
+model.</p></li>
+<li><p><strong>mesh_file_path</strong> – Path to XML file defining spatial mesh to solve on.</p></li>
+<li><p><strong>extract_outputs_function</strong> – Function to extract required outputs from model.
+This function is passed the path to the temporary directory any outputs
+from solver executable are written to, the <cite>subprocess.CompletedProcess</cite>
+object returned by the <cite>subprocess.run</cite> call which captures any output
+to the <cite>stdout</cite> and <cite>stderr</cite> streams as well as the exit status of the
+command (which may be useful for checking that the model run executed
+successfully before loading outputs) and a dictionary of all of the
+parameter values in the session file used to run the model. The return
+value of this function is returned when calling the model.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>num_omp_threads</strong> – Value to set OMP_NUM_THREADS environment variable
+specifying number of OpenMP threads to use, in local environment that
+solver is executed.</p></li>
+<li><p><strong>num_mpi_processes</strong> – Number of message passing interface (MPI) processes to
+run solver executable with. If set to 1 (the default) solver exectuable
+is run directly if set to greater than 1 then solver exectuable
+command is passed to <cite>mpirun</cite> with <cite>-n</cite> argument set to specified number
+of processes.</p></li>
+<li><p><strong>mpirun_options</strong> – Any additional optional arguments to pass to <cite>mpirun</cite>
+command (only used when <cite>num_mpi_processes &gt; 1</cite>).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nesopy.model.AbstractModel.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">parameter_overrides</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/nesopy/model.html#AbstractModel.__call__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.model.AbstractModel.__call__" title="Permalink to this definition"></a></dt>
+<dd><p>Simulate model and return extracted outputs with specified parameter overrides.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameter_overrides</strong> – Values to override default parameters in session file
+used to run model with.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Outputs returned by <cite>extract_outputs</cite> function specified when constructing
+model instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nesopy.model.NativeModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nesopy.model.</span></span><span class="sig-name descname"><span class="pre">NativeModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/nesopy/model.html#NativeModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.model.NativeModel" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#nesopy.model.AbstractModel" title="nesopy.model.AbstractModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractModel</span></code></a></p>
+<p>NESO model using solver installed natively on local filesystem.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nesopy.model.NativeModel.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/nesopy/model.html#NativeModel.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.model.NativeModel.__init__" title="Permalink to this definition"></a></dt>
+<dd><p>Create a new native NESO model wrapper instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>solver_executable_path</strong> – Path to NESO solver executable to use.</p></li>
+<li><p><strong>base_session_file_path</strong> – Path to XML file defining bae NESO configuration.
+Parameters values defined in this file are used as defaults unless
+overridden by <cite>parameter_overrides</cite> keyword arguments when calling
+model.</p></li>
+<li><p><strong>mesh_file_path</strong> – Path to XML file defining spatial mesh to solve on.</p></li>
+<li><p><strong>extract_outputs_function</strong> – Function to extract required outputs from model.
+This function is passed the path to the temporary directory any outputs
+from solver executable are written to, the <cite>subprocess.CompletedProcess</cite>
+object returned by the <cite>subprocess.run</cite> call which captures any output
+to the <cite>stdout</cite> and <cite>stderr</cite> streams as well as the exit status of the
+command (which may be useful for checking that the model run executed
+successfully before loading outputs) and a dictionary of all of the
+parameter values in the session file used to run the model. The return
+value of this function is returned when calling the model.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>num_omp_threads</strong> – Value to set OMP_NUM_THREADS environment variable
+specifying number of OpenMP threads to use, in local environment that
+solver is executed.</p></li>
+<li><p><strong>num_mpi_processes</strong> – Number of message passing interface (MPI) processes to
+run solver executable with. If set to 1 (the default) solver exectuable
+is run directly if set to greater than 1 then solver exectuable
+command is passed to <cite>mpirun</cite> with <cite>-n</cite> argument set to specified number
+of processes.</p></li>
+<li><p><strong>mpi_run_options</strong> – Any additional optional arguments to pass to <cite>mpirun</cite>
+command (only used when <cite>num_mpi_processes &gt; 1</cite>).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nesopy.model.NativeModel.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">parameter_overrides</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nesopy.model.NativeModel.__call__" title="Permalink to this definition"></a></dt>
+<dd><p>Simulate model and return extracted outputs with specified parameter overrides.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameter_overrides</strong> – Values to override default parameters in session file
+used to run model with.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Outputs returned by <cite>extract_outputs</cite> function specified when constructing
+model instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nesopy.model.DockerModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nesopy.model.</span></span><span class="sig-name descname"><span class="pre">DockerModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">container_setup_commands</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">container_mount_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'/output'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/nesopy/model.html#DockerModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.model.DockerModel" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#nesopy.model.AbstractModel" title="nesopy.model.AbstractModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractModel</span></code></a></p>
+<p>NESO model using solver installed in Docker image.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="nesopy.model.DockerModel.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">container_setup_commands</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">container_mount_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'/output'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/nesopy/model.html#DockerModel.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.model.DockerModel.__init__" title="Permalink to this definition"></a></dt>
+<dd><p>Create a new Docker based NESO model wrapper instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>image_name</strong> – Name of Docker image in which NESO solvers are installed.</p></li>
+<li><p><strong>solver_executable_path</strong> – Path to NESO solver executable to use.</p></li>
+<li><p><strong>base_session_file_path</strong> – Path to XML file defining bae NESO configuration.
+Parameters values defined in this file are used as defaults unless
+overridden by <cite>parameter_overrides</cite> keyword arguments when calling
+model.</p></li>
+<li><p><strong>mesh_file_path</strong> – Path to XML file defining spatial mesh to solve on.</p></li>
+<li><p><strong>extract_outputs_function</strong> – Function to extract required outputs from model.
+This function is passed the path to the temporary directory any outputs
+from solver executable are written to, the <cite>subprocess.CompletedProcess</cite>
+object returned by the <cite>subprocess.run</cite> call which captures any output
+to the <cite>stdout</cite> and <cite>stderr</cite> streams as well as the exit status of the
+command (which may be useful for checking that the model run executed
+successfully before loading outputs) and a dictionary of all of the
+parameter values in the session file used to run the model. The return
+value of this function is returned when calling the model.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>container_setup_commands</strong> – Any commands to execute in Docker container shell
+before executing solver command (for example to setup environment within
+container), as a sequence of strings.</p></li>
+<li><p><strong>container_mount_path</strong> – Path to bind mount on container the temporary
+directory on local host system used for writing outputs to and as
+working directory for solver executions. No directory or file should
+already exist at this path on the container.</p></li>
+<li><p><strong>num_omp_threads</strong> – Value to set OMP_NUM_THREADS environment variable
+specifying number of OpenMP threads to use, in local environment that
+solver is executed.</p></li>
+<li><p><strong>num_mpi_processes</strong> – Number of message passing interface (MPI) processes to
+run solver executable with. If set to 1 (the default) solver exectuable
+is run directly if set to greater than 1 then solver exectuable
+command is passed to <cite>mpirun</cite> with <cite>-n</cite> argument set to specified number
+of processes.</p></li>
+<li><p><strong>mpi_run_options</strong> – Any additional optional arguments to pass to <cite>mpirun</cite>
+command (only used when <cite>num_mpi_processes &gt; 1</cite>).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nesopy.model.DockerModel.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">parameter_overrides</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nesopy.model.DockerModel.__call__" title="Permalink to this definition"></a></dt>
+<dd><p>Simulate model and return extracted outputs with specified parameter overrides.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameter_overrides</strong> – Values to override default parameters in session file
+used to run model with.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Outputs returned by <cite>extract_outputs</cite> function specified when constructing
+model instance.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-nesopy.output">
+<span id="nesopy-output-module"></span><h2>nesopy.output module<a class="headerlink" href="#module-nesopy.output" title="Permalink to this heading"></a></h2>
+<p>Functions for extracting and processing outputs from NESO models.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="nesopy.output.read_hdf5_datasets">
+<span class="sig-prename descclassname"><span class="pre">nesopy.output.</span></span><span class="sig-name descname"><span class="pre">read_hdf5_datasets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdf5_file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_paths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">collections.abc.Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/nesopy/output.html#read_hdf5_datasets"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nesopy.output.read_hdf5_datasets" title="Permalink to this definition"></a></dt>
+<dd><p>Read one or more datasets at specified paths from a HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hdf5_file_path</strong> – Path to HDF5 file to read dataset(s) from.</p></li>
+<li><p><strong>dataset_paths</strong> – Map from string keys to one or more HDF5 paths to datasets within
+the HDF5 file to read. If a key is associated with a single HDF5 path then
+the returned dictionary will contain an entry for the key corresponding to
+the dataset specified by that path as a NumPy array. If a key is associated
+with a sequence of paths, then it is assumed all paths refer to HDF5 datasets
+of the same shape such that they can be stacked in an array with number of
+dimensions one more than each datasets number of dimensions, with the
+returned dictionary then containing an entry for the key corresponding to
+this stacked array, with first axis indexing across the dataset paths.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary of read datasets with keys corresponding to keys of <cite>dataset_paths</cite>
+argument, and values either the associated dataset as a NumPy array (if the
+key in <cite>dataset_paths</cite> mapped to a single path) or a the associated stacked
+datasets as a NumPy array (if the key in <cite>dataset_paths</cite> mapped to a sequence
+of paths), with the first axis of the array corresponding to the indexing
+through the sequence of paths associated with the key.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to nesopy’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, University College London.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

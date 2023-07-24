@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nesopy.model &mdash; nesopy 0.1.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            nesopy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../nesopy.html">nesopy package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">nesopy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">nesopy.model</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for nesopy.model</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Wrappers for NESO models.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Sequence</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">Element</span>
+<span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">parse</span> <span class="k">as</span> <span class="n">xml_parse</span>
+
+<span class="n">ParametersDict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span><span class="p">]</span>
+<span class="n">ExtractOutputsFunction</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
+    <span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">,</span> <span class="n">ParametersDict</span><span class="p">],</span>
+    <span class="n">Any</span><span class="p">,</span>
+<span class="p">]</span>
+<span class="n">PathLike</span> <span class="o">=</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span>
+
+
+<div class="viewcode-block" id="AbstractModel"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.AbstractModel">[docs]</a><span class="k">class</span> <span class="nc">AbstractModel</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for wrappers for executing a NESO solver and extracting outputs.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AbstractModel.__init__"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.AbstractModel.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">solver_executable_path</span><span class="p">:</span> <span class="n">PathLike</span><span class="p">,</span>
+        <span class="n">base_session_file_path</span><span class="p">:</span> <span class="n">PathLike</span><span class="p">,</span>
+        <span class="n">mesh_file_path</span><span class="p">:</span> <span class="n">PathLike</span><span class="p">,</span>
+        <span class="n">extract_outputs_function</span><span class="p">:</span> <span class="n">ExtractOutputsFunction</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">num_omp_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">num_mpi_processes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">mpirun_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a new NESO model wrapper instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            solver_executable_path: Path to NESO solver executable to use.</span>
+<span class="sd">            base_session_file_path: Path to XML file defining bae NESO configuration.</span>
+<span class="sd">                Parameters values defined in this file are used as defaults unless</span>
+<span class="sd">                overridden by `parameter_overrides` keyword arguments when calling</span>
+<span class="sd">                model.</span>
+<span class="sd">            mesh_file_path: Path to XML file defining spatial mesh to solve on.</span>
+<span class="sd">            extract_outputs_function: Function to extract required outputs from model.</span>
+<span class="sd">                This function is passed the path to the temporary directory any outputs</span>
+<span class="sd">                from solver executable are written to, the `subprocess.CompletedProcess`</span>
+<span class="sd">                object returned by the `subprocess.run` call which captures any output</span>
+<span class="sd">                to the `stdout` and `stderr` streams as well as the exit status of the</span>
+<span class="sd">                command (which may be useful for checking that the model run executed</span>
+<span class="sd">                successfully before loading outputs) and a dictionary of all of the</span>
+<span class="sd">                parameter values in the session file used to run the model. The return</span>
+<span class="sd">                value of this function is returned when calling the model.</span>
+
+<span class="sd">        Keyword Args:</span>
+<span class="sd">            num_omp_threads: Value to set OMP_NUM_THREADS environment variable</span>
+<span class="sd">                specifying number of OpenMP threads to use, in local environment that</span>
+<span class="sd">                solver is executed.</span>
+<span class="sd">            num_mpi_processes: Number of message passing interface (MPI) processes to</span>
+<span class="sd">                run solver executable with. If set to 1 (the default) solver exectuable</span>
+<span class="sd">                is run directly if set to greater than 1 then solver exectuable</span>
+<span class="sd">                command is passed to `mpirun` with `-n` argument set to specified number</span>
+<span class="sd">                of processes.</span>
+<span class="sd">            mpirun_options: Any additional optional arguments to pass to `mpirun`</span>
+<span class="sd">                command (only used when `num_mpi_processes &gt; 1`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_solver_executable_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">solver_executable_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mesh_file_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">mesh_file_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_base_session_file_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">base_session_file_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extract_outputs_function</span> <span class="o">=</span> <span class="n">extract_outputs_function</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_num_omp_threads</span> <span class="o">=</span> <span class="n">num_omp_threads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_num_mpi_processes</span> <span class="o">=</span> <span class="n">num_mpi_processes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mpirun_options</span> <span class="o">=</span> <span class="n">mpirun_options</span></div>
+
+    <span class="k">def</span> <span class="nf">_write_session_file_and_read_parameters</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">parameter_overrides</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ParametersDict</span><span class="p">:</span>
+        <span class="n">tree</span> <span class="o">=</span> <span class="n">xml_parse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_base_session_file_path</span><span class="p">)</span>  <span class="c1"># noqa: S314</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">getroot</span><span class="p">()</span>
+        <span class="n">parameters_container</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;CONDITIONS&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">find</span><span class="p">(</span>  <span class="c1"># type: ignore[union-attr]</span>
+            <span class="s2">&quot;PARAMETERS&quot;</span><span class="p">,</span>
+        <span class="p">)</span>  <span class="c1"># type: ignore[union-attr]</span>
+        <span class="n">default_parameter_values</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">parameter_elements_to_remove</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">parameters_container</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="s2">&quot;P&quot;</span><span class="p">):</span>  <span class="c1"># type: ignore[union-attr]</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span>
+                <span class="sa">r</span><span class="s2">&quot;\s*(?P&lt;key&gt;\w+)\s*=\s*(?P&lt;value&gt;[0-9.-]+)\s*&quot;</span><span class="p">,</span>
+                <span class="n">element</span><span class="o">.</span><span class="n">text</span><span class="p">,</span>  <span class="c1"># type: ignore[arg-type]</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Invalid parameter specification </span><span class="si">{</span><span class="n">element</span><span class="o">.</span><span class="n">text</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="s2">&quot;in base session file&quot;</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;key&quot;</span><span class="p">)</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">)</span>
+            <span class="n">default_parameter_values</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;.&quot;</span> <span class="ow">in</span> <span class="n">value</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">parameter_overrides</span><span class="p">:</span>
+                <span class="n">parameter_elements_to_remove</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+        <span class="c1"># Remove parameter elements that will be added when setting overrides.</span>
+        <span class="c1"># We do this outside above loop to avoid changing the container while iterating</span>
+        <span class="c1"># over it.</span>
+        <span class="k">for</span> <span class="n">parameter_element</span> <span class="ow">in</span> <span class="n">parameter_elements_to_remove</span><span class="p">:</span>
+            <span class="n">parameters_container</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">parameter_element</span><span class="p">)</span>  <span class="c1"># type: ignore[union-attr]</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parameter_overrides</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">parameter_element</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="s2">&quot;P&quot;</span><span class="p">)</span>
+            <span class="n">parameter_element</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">parameters_container</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parameter_element</span><span class="p">)</span>  <span class="c1"># type: ignore[union-attr]</span>
+        <span class="n">tree</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">default_parameter_values</span> <span class="o">|</span> <span class="n">parameter_overrides</span>
+
+    <span class="k">def</span> <span class="nf">_construct_run_command</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">session_file_path</span><span class="p">:</span> <span class="n">PathLike</span><span class="p">,</span>
+        <span class="n">mesh_file_path</span><span class="p">:</span> <span class="n">PathLike</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">base_command</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_solver_executable_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">session_file_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">mesh_file_path</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_mpi_processes</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">mpi_command</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;mpirun -n </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_mpi_processes</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_mpirun_options</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">mpi_command</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">base_command</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">base_command</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">_run_model</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">session_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">temporary_directory_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run model with specified session file outputting to temporary directory.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            session_file_path: Path to session file to run solver with.</span>
+<span class="sd">            temporary_directory: Path to directory to which model outputs should be</span>
+<span class="sd">                written.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Completed process object with any captured output from model execution.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AbstractModel.__call__"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.AbstractModel.__call__">[docs]</a>    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">parameter_overrides</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Simulate model and return extracted outputs with specified parameter overrides.</span>
+
+<span class="sd">        Keyword Args:</span>
+<span class="sd">            parameter_overrides: Values to override default parameters in session file</span>
+<span class="sd">               used to run model with.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Outputs returned by `extract_outputs` function specified when constructing</span>
+<span class="sd">            model instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">temporary_directory</span><span class="p">:</span>
+            <span class="n">temporary_directory_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">temporary_directory</span><span class="p">)</span>
+            <span class="n">session_file_path</span> <span class="o">=</span> <span class="n">temporary_directory_path</span> <span class="o">/</span> <span class="s2">&quot;session.xml&quot;</span>
+            <span class="n">parameter_values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_write_session_file_and_read_parameters</span><span class="p">(</span>
+                <span class="n">session_file_path</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">parameter_overrides</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">completed_process</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_model</span><span class="p">(</span>
+                <span class="n">session_file_path</span><span class="p">,</span>
+                <span class="n">temporary_directory_path</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_outputs_function</span><span class="p">(</span>
+                <span class="n">temporary_directory_path</span><span class="p">,</span>
+                <span class="n">completed_process</span><span class="p">,</span>
+                <span class="n">parameter_values</span><span class="p">,</span>
+            <span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="NativeModel"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.NativeModel">[docs]</a><span class="k">class</span> <span class="nc">NativeModel</span><span class="p">(</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;NESO model using solver installed natively on local filesystem.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="NativeModel.__init__"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.NativeModel.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a new native NESO model wrapper instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            solver_executable_path: Path to NESO solver executable to use.</span>
+<span class="sd">            base_session_file_path: Path to XML file defining bae NESO configuration.</span>
+<span class="sd">                Parameters values defined in this file are used as defaults unless</span>
+<span class="sd">                overridden by `parameter_overrides` keyword arguments when calling</span>
+<span class="sd">                model.</span>
+<span class="sd">            mesh_file_path: Path to XML file defining spatial mesh to solve on.</span>
+<span class="sd">            extract_outputs_function: Function to extract required outputs from model.</span>
+<span class="sd">                This function is passed the path to the temporary directory any outputs</span>
+<span class="sd">                from solver executable are written to, the `subprocess.CompletedProcess`</span>
+<span class="sd">                object returned by the `subprocess.run` call which captures any output</span>
+<span class="sd">                to the `stdout` and `stderr` streams as well as the exit status of the</span>
+<span class="sd">                command (which may be useful for checking that the model run executed</span>
+<span class="sd">                successfully before loading outputs) and a dictionary of all of the</span>
+<span class="sd">                parameter values in the session file used to run the model. The return</span>
+<span class="sd">                value of this function is returned when calling the model.</span>
+
+<span class="sd">        Keyword Args:</span>
+<span class="sd">            num_omp_threads: Value to set OMP_NUM_THREADS environment variable</span>
+<span class="sd">                specifying number of OpenMP threads to use, in local environment that</span>
+<span class="sd">                solver is executed.</span>
+<span class="sd">            num_mpi_processes: Number of message passing interface (MPI) processes to</span>
+<span class="sd">                run solver executable with. If set to 1 (the default) solver exectuable</span>
+<span class="sd">                is run directly if set to greater than 1 then solver exectuable</span>
+<span class="sd">                command is passed to `mpirun` with `-n` argument set to specified number</span>
+<span class="sd">                of processes.</span>
+<span class="sd">            mpi_run_options: Any additional optional arguments to pass to `mpirun`</span>
+<span class="sd">                command (only used when `num_mpi_processes &gt; 1`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">path_attribute</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">&quot;solver_executable_path&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;mesh_file_path&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;base_session_file_path&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_</span><span class="si">{</span><span class="n">path_attribute</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_</span><span class="si">{</span><span class="n">path_attribute</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">path</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;No file exists at </span><span class="si">{</span><span class="n">path_attribute</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_run_model</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">session_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">temporary_directory_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+        <span class="n">run_command</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_run_command</span><span class="p">(</span>
+            <span class="n">session_file_path</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mesh_file_path</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">run_command</span><span class="p">,</span>
+            <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># noqa: S602</span>
+            <span class="n">cwd</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">temporary_directory_path</span><span class="p">),</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="o">|</span> <span class="p">{</span><span class="s2">&quot;OMP_NUM_THREADS&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_omp_threads</span><span class="p">)},</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DockerModel"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.DockerModel">[docs]</a><span class="k">class</span> <span class="nc">DockerModel</span><span class="p">(</span><span class="n">AbstractModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;NESO model using solver installed in Docker image.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DockerModel.__init__"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.DockerModel.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">image_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="n">container_setup_commands</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+        <span class="n">container_mount_path</span><span class="p">:</span> <span class="n">PathLike</span> <span class="o">=</span> <span class="s2">&quot;/output&quot;</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a new Docker based NESO model wrapper instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            image_name: Name of Docker image in which NESO solvers are installed.</span>
+<span class="sd">            solver_executable_path: Path to NESO solver executable to use.</span>
+<span class="sd">            base_session_file_path: Path to XML file defining bae NESO configuration.</span>
+<span class="sd">                Parameters values defined in this file are used as defaults unless</span>
+<span class="sd">                overridden by `parameter_overrides` keyword arguments when calling</span>
+<span class="sd">                model.</span>
+<span class="sd">            mesh_file_path: Path to XML file defining spatial mesh to solve on.</span>
+<span class="sd">            extract_outputs_function: Function to extract required outputs from model.</span>
+<span class="sd">                This function is passed the path to the temporary directory any outputs</span>
+<span class="sd">                from solver executable are written to, the `subprocess.CompletedProcess`</span>
+<span class="sd">                object returned by the `subprocess.run` call which captures any output</span>
+<span class="sd">                to the `stdout` and `stderr` streams as well as the exit status of the</span>
+<span class="sd">                command (which may be useful for checking that the model run executed</span>
+<span class="sd">                successfully before loading outputs) and a dictionary of all of the</span>
+<span class="sd">                parameter values in the session file used to run the model. The return</span>
+<span class="sd">                value of this function is returned when calling the model.</span>
+
+<span class="sd">        Keyword Args:</span>
+<span class="sd">            container_setup_commands: Any commands to execute in Docker container shell</span>
+<span class="sd">                before executing solver command (for example to setup environment within</span>
+<span class="sd">                container), as a sequence of strings.</span>
+<span class="sd">            container_mount_path: Path to bind mount on container the temporary</span>
+<span class="sd">                directory on local host system used for writing outputs to and as</span>
+<span class="sd">                working directory for solver executions. No directory or file should</span>
+<span class="sd">                already exist at this path on the container.</span>
+<span class="sd">            num_omp_threads: Value to set OMP_NUM_THREADS environment variable</span>
+<span class="sd">                specifying number of OpenMP threads to use, in local environment that</span>
+<span class="sd">                solver is executed.</span>
+<span class="sd">            num_mpi_processes: Number of message passing interface (MPI) processes to</span>
+<span class="sd">                run solver executable with. If set to 1 (the default) solver exectuable</span>
+<span class="sd">                is run directly if set to greater than 1 then solver exectuable</span>
+<span class="sd">                command is passed to `mpirun` with `-n` argument set to specified number</span>
+<span class="sd">                of processes.</span>
+<span class="sd">            mpi_run_options: Any additional optional arguments to pass to `mpirun`</span>
+<span class="sd">                command (only used when `num_mpi_processes &gt; 1`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_image_name</span> <span class="o">=</span> <span class="n">image_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_container_setup_commands</span> <span class="o">=</span> <span class="n">container_setup_commands</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_container_mount_path</span> <span class="o">=</span> <span class="n">container_mount_path</span></div>
+
+    <span class="k">def</span> <span class="nf">_run_model</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">session_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">temporary_directory_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+        <span class="c1"># Ensure copies of session and mesh files in temporary directory that container</span>
+        <span class="c1"># will have access to.</span>
+        <span class="k">if</span> <span class="n">session_file_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">!=</span> <span class="n">temporary_directory_path</span><span class="p">:</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span>
+                <span class="n">session_file_path</span><span class="p">,</span>
+                <span class="n">temporary_directory_path</span> <span class="o">/</span> <span class="n">session_file_path</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="n">mesh_file_path</span> <span class="o">=</span> <span class="n">temporary_directory_path</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mesh_file_path</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_mesh_file_path</span><span class="p">,</span> <span class="n">mesh_file_path</span><span class="p">)</span>
+        <span class="c1"># Get paths to session and mesh files within _container file system_.</span>
+        <span class="n">container_mount_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_container_mount_path</span><span class="p">)</span>
+        <span class="n">container_session_file_path</span> <span class="o">=</span> <span class="n">container_mount_path</span> <span class="o">/</span> <span class="n">session_file_path</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">container_mesh_file_path</span> <span class="o">=</span> <span class="n">container_mount_path</span> <span class="o">/</span> <span class="n">mesh_file_path</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">run_command</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_run_command</span><span class="p">(</span>
+            <span class="n">container_session_file_path</span><span class="p">,</span>
+            <span class="n">container_mesh_file_path</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">container_commands</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_container_setup_commands</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;export OMP_NUM_THREADS=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_omp_threads</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">run_command</span><span class="p">,</span>
+            <span class="c1"># We need to change user and group owner for any files written by container</span>
+            <span class="c1"># to match current user and group IDs to avoid file permission errors when</span>
+            <span class="c1"># cleaning up temporary directory.</span>
+            <span class="sa">f</span><span class="s2">&quot;chown -R </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getuid</span><span class="p">()</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getgid</span><span class="p">()</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">docker_command</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;docker run --rm &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;-v </span><span class="si">{</span><span class="n">temporary_directory_path</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2">:rw  &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;-w </span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_image_name</span><span class="si">}</span><span class="s2"> /bin/bash -c &#39;</span><span class="si">{</span><span class="s1">&#39;; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">container_commands</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">docker_command</span><span class="p">,</span>
+            <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># noqa: S602</span>
+            <span class="n">cwd</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">temporary_directory_path</span><span class="p">),</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, University College London.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
