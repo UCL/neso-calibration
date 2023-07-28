@@ -21,7 +21,10 @@ extracting the generated outputs.
 
 An example of using this interface to run and extract outputs from a NESO solver built and
 installed in a Docker image is given in
-[a tutorial notebook](examples/two_stream/docker_example.ipynb).
+[a tutorial notebook](examples/two_stream/docker_example.ipynb) and an example of inferring
+the posterior on parameters of a model using a NESO solver in a simulated data setting
+using [the PyVBMC package](https://acerbilab.github.io/pyvbmc/index.html) is given in
+[a separate notebook](examples/two_stream/pyvbmc_calibration_example.ipynb).
 
 This project is developed in collaboration with the
 [Centre for Advanced Research Computing](https://ucl.ac.uk/arc), University College London.
