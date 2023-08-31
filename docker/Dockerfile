@@ -1,4 +1,4 @@
-FROM spack/ubuntu-jammy:latest as builder
+FROM spack/ubuntu-jammy:latest
 ENV NESO_ROOT=/root/NESO
 RUN spack install intel-oneapi-compilers@2022.1.0 && \
     spack load intel-oneapi-compilers && \
