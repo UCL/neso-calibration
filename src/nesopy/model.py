@@ -1,9 +1,11 @@
 """Wrappers for NESO models."""
 
+import asyncio
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
@@ -14,10 +16,42 @@ from xml.etree.ElementTree import parse as xml_parse
 
 ParametersDict = dict[str, float | int]
 ExtractOutputsFunction = Callable[
-    [Path, subprocess.CompletedProcess, ParametersDict],
+    [Path, subprocess.CompletedProcess | asyncio.subprocess.Process, ParametersDict],
     Any,
 ]
 PathLike = str | Path
+
+
+async def _redirect_stream(input_stream, output_stream):
+    """Asynchronously redirect lines from input_stream to output_stream."""
+    while True:
+        line = await input_stream.readline()
+        if line:
+            output_stream.write(line.decode())
+        else:
+            break
+
+
+async def _create_subprocess_with_redirected_streams(
+    cmd: str,
+    *,
+    cwd: str | None,
+    env: dict[str, str] | None,
+) -> asyncio.subprocess.Process:
+    """Create a subprocess with stdout & stderr redirected to parent process streams."""
+    process = await asyncio.create_subprocess_shell(
+        cmd=cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=cwd,
+        env=env,
+    )
+    await asyncio.gather(
+        _redirect_stream(process.stdout, sys.stdout),
+        _redirect_stream(process.stderr, sys.stderr),
+    )
+    await process.wait()
+    return process
 
 
 class AbstractModel(ABC):
@@ -33,6 +67,7 @@ class AbstractModel(ABC):
         num_omp_threads: int = 1,
         num_mpi_processes: int = 1,
         mpirun_options: str = "",
+        redirect_subprocess_streams: bool = False,
     ):
         """Create a new NESO model wrapper instance.
 
@@ -46,9 +81,10 @@ class AbstractModel(ABC):
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
                 from solver executable are written to, the `subprocess.CompletedProcess`
-                object returned by the `subprocess.run` call which captures any output
-                to the `stdout` and `stderr` streams as well as the exit status of the
-                command (which may be useful for checking that the model run executed
+                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
+                (if `redirect_subprocess_streams=True`) object returned by the
+                subprocess used to execute the model run (which has a `returncode`
+                attribute may be useful for checking that the model run executed
                 successfully before loading outputs) and a dictionary of all of the
                 parameter values in the session file used to run the model. The return
                 value of this function is returned when calling the model.
@@ -64,6 +100,14 @@ class AbstractModel(ABC):
                 of processes.
             mpirun_options: Any additional optional arguments to pass to `mpirun`
                 command (only used when `num_mpi_processes > 1`).
+            redirect_subprocess_streams: Whether to redirect the `stdout` and `stderr`
+                output streams of the subprocess used to run the model in to the
+                corresponding output streams of the output process. Enabling this
+                redirection can be useful for getting live output from the model while
+                it is running. If set to `False` the completed process object passed to
+                the `extract_outputs` function has string `stdout` and `stderr`
+                attributes which can be used to access any text written to the output
+                streams after the model run subprocess has completed.
         """
         self._solver_executable_path = Path(solver_executable_path)
         self._mesh_file_path = Path(mesh_file_path)
@@ -72,6 +116,7 @@ class AbstractModel(ABC):
         self._num_omp_threads = num_omp_threads
         self._num_mpi_processes = num_mpi_processes
         self._mpirun_options = mpirun_options
+        self._redirect_subprocess_streams = redirect_subprocess_streams
 
     def _write_session_file_and_read_parameters(
         self,
@@ -127,12 +172,36 @@ class AbstractModel(ABC):
         else:
             return base_command
 
+    def _run_subprocess(
+        self,
+        cmd: str,
+        *,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+        if self._redirect_subprocess_streams:
+            return asyncio.run(
+                _create_subprocess_with_redirected_streams(
+                    cmd=cmd,
+                    cwd=cwd,
+                    env=env,
+                ),
+            )
+        else:
+            return subprocess.run(
+                cmd,
+                cwd=cwd,
+                env=env,
+                shell=True,  # noqa: S602
+                capture_output=True,
+            )
+
     @abstractmethod
     def _run_model(
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
         """Run model with specified session file outputting to temporary directory.
 
         Args:
@@ -190,9 +259,10 @@ class NativeModel(AbstractModel):
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
                 from solver executable are written to, the `subprocess.CompletedProcess`
-                object returned by the `subprocess.run` call which captures any output
-                to the `stdout` and `stderr` streams as well as the exit status of the
-                command (which may be useful for checking that the model run executed
+                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
+                (if `redirect_subprocess_streams=True`) object returned by the
+                subprocess used to execute the model run (which has a `returncode`
+                attribute may be useful for checking that the model run executed
                 successfully before loading outputs) and a dictionary of all of the
                 parameter values in the session file used to run the model. The return
                 value of this function is returned when calling the model.
@@ -208,6 +278,14 @@ class NativeModel(AbstractModel):
                 of processes.
             mpi_run_options: Any additional optional arguments to pass to `mpirun`
                 command (only used when `num_mpi_processes > 1`).
+            redirect_subprocess_streams: Whether to redirect the `stdout` and `stderr`
+                output streams of the subprocess used to run the model in to the
+                corresponding output streams of the output process. Enabling this
+                redirection can be useful for getting live output from the model while
+                it is running. If set to `False` the completed process object passed to
+                the `extract_outputs` function has string `stdout` and `stderr`
+                attributes which can be used to access any text written to the output
+                streams after the model run subprocess has completed.
         """
         super().__init__(*args, **kwargs)
         for path_attribute in (
@@ -225,16 +303,14 @@ class NativeModel(AbstractModel):
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
         run_command = self._construct_run_command(
             session_file_path,
             self._mesh_file_path,
         )
-        return subprocess.run(
+        return self._run_subprocess(
             run_command,
-            shell=True,  # noqa: S602
             cwd=str(temporary_directory_path),
-            capture_output=True,
             env=os.environ | {"OMP_NUM_THREADS": str(self._num_omp_threads)},
         )
 
@@ -264,9 +340,10 @@ class DockerModel(AbstractModel):
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
                 from solver executable are written to, the `subprocess.CompletedProcess`
-                object returned by the `subprocess.run` call which captures any output
-                to the `stdout` and `stderr` streams as well as the exit status of the
-                command (which may be useful for checking that the model run executed
+                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
+                (if `redirect_subprocess_streams=True`) object returned by the
+                subprocess used to execute the model run (which has a `returncode`
+                attribute may be useful for checking that the model run executed
                 successfully before loading outputs) and a dictionary of all of the
                 parameter values in the session file used to run the model. The return
                 value of this function is returned when calling the model.
@@ -294,6 +371,14 @@ class DockerModel(AbstractModel):
                 of processes.
             mpi_run_options: Any additional optional arguments to pass to `mpirun`
                 command (only used when `num_mpi_processes > 1`).
+            redirect_subprocess_streams: Whether to redirect the `stdout` and `stderr`
+                output streams of the subprocess used to run the model in to the
+                corresponding output streams of the output process. Enabling this
+                redirection can be useful for getting live output from the model while
+                it is running. If set to `False` the completed process object passed to
+                the `extract_outputs` function has string `stdout` and `stderr`
+                attributes which can be used to access any text written to the output
+                streams after the model run subprocess has completed.
         """
         super().__init__(*args, **kwargs)
         self._image_name = image_name
@@ -305,7 +390,7 @@ class DockerModel(AbstractModel):
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
         # Ensure copies of session and mesh files in temporary directory that container
         # will have access to.
         if session_file_path.parent != temporary_directory_path:
@@ -343,9 +428,4 @@ class DockerModel(AbstractModel):
             f"-w {container_mount_path} {entrypoint_argument}"
             f"{self._image_name} /bin/bash -c '{' && '.join(container_commands)}'"
         )
-        return subprocess.run(
-            docker_command,
-            shell=True,  # noqa: S602
-            cwd=str(temporary_directory_path),
-            capture_output=True,
-        )
+        return self._run_subprocess(docker_command, cwd=str(temporary_directory_path))
