@@ -319,6 +319,7 @@
         <span class="o">*</span><span class="n">args</span><span class="p">,</span>
         <span class="n">container_setup_commands</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
         <span class="n">container_mount_path</span><span class="p">:</span> <span class="n">PathLike</span> <span class="o">=</span> <span class="s2">&quot;/output&quot;</span><span class="p">,</span>
+        <span class="n">container_entry_point</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a new Docker based NESO model wrapper instance.</span>
@@ -326,7 +327,7 @@
 <span class="sd">        Args:</span>
 <span class="sd">            image_name: Name of Docker image in which NESO solvers are installed.</span>
 <span class="sd">            solver_executable_path: Path to NESO solver executable to use.</span>
-<span class="sd">            base_session_file_path: Path to XML file defining bae NESO configuration.</span>
+<span class="sd">            base_session_file_path: Path to XML file defining base NESO configuration.</span>
 <span class="sd">                Parameters values defined in this file are used as defaults unless</span>
 <span class="sd">                overridden by `parameter_overrides` keyword arguments when calling</span>
 <span class="sd">                model.</span>
@@ -349,6 +350,11 @@
 <span class="sd">                directory on local host system used for writing outputs to and as</span>
 <span class="sd">                working directory for solver executions. No directory or file should</span>
 <span class="sd">                already exist at this path on the container.</span>
+<span class="sd">            container_entrypoint: Entrypoint for container, specifying command executed</span>
+<span class="sd">                when container is started and to which the run arguments are passed. If</span>
+<span class="sd">                :code:`None` (the default) then the default entrypoint for the image</span>
+<span class="sd">                will be used, otherwise the command specified by this argument will be</span>
+<span class="sd">                used.</span>
 <span class="sd">            num_omp_threads: Value to set OMP_NUM_THREADS environment variable</span>
 <span class="sd">                specifying number of OpenMP threads to use, in local environment that</span>
 <span class="sd">                solver is executed.</span>
@@ -363,7 +369,8 @@
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_image_name</span> <span class="o">=</span> <span class="n">image_name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_container_setup_commands</span> <span class="o">=</span> <span class="n">container_setup_commands</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_container_mount_path</span> <span class="o">=</span> <span class="n">container_mount_path</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_container_mount_path</span> <span class="o">=</span> <span class="n">container_mount_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_container_entry_point</span> <span class="o">=</span> <span class="n">container_entry_point</span></div>
 
     <span class="k">def</span> <span class="nf">_run_model</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -396,11 +403,16 @@
             <span class="c1"># cleaning up temporary directory.</span>
             <span class="sa">f</span><span class="s2">&quot;chown -R </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getuid</span><span class="p">()</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getgid</span><span class="p">()</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
         <span class="p">]</span>
+        <span class="n">entrypoint_argument</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;&quot;</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_container_entry_point</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;--entrypoint </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_container_entry_point</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
         <span class="n">docker_command</span> <span class="o">=</span> <span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;docker run --rm &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;-v </span><span class="si">{</span><span class="n">temporary_directory_path</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2">:rw  &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;-w </span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2"> &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_image_name</span><span class="si">}</span><span class="s2"> /bin/bash -c &#39;</span><span class="si">{</span><span class="s1">&#39;; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">container_commands</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;-w </span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">entrypoint_argument</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_image_name</span><span class="si">}</span><span class="s2"> /bin/bash -c &#39;</span><span class="si">{</span><span class="s1">&#39; &amp;&amp; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">container_commands</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
             <span class="n">docker_command</span><span class="p">,</span>
