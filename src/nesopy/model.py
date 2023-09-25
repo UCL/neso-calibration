@@ -248,6 +248,7 @@ class DockerModel(AbstractModel):
         *args,
         container_setup_commands: Sequence[str] = (),
         container_mount_path: PathLike = "/output",
+        container_entry_point: str | None = None,
         **kwargs,
     ):
         """Create a new Docker based NESO model wrapper instance.
@@ -255,7 +256,7 @@ class DockerModel(AbstractModel):
         Args:
             image_name: Name of Docker image in which NESO solvers are installed.
             solver_executable_path: Path to NESO solver executable to use.
-            base_session_file_path: Path to XML file defining bae NESO configuration.
+            base_session_file_path: Path to XML file defining base NESO configuration.
                 Parameters values defined in this file are used as defaults unless
                 overridden by `parameter_overrides` keyword arguments when calling
                 model.
@@ -278,6 +279,11 @@ class DockerModel(AbstractModel):
                 directory on local host system used for writing outputs to and as
                 working directory for solver executions. No directory or file should
                 already exist at this path on the container.
+            container_entrypoint: Entrypoint for container, specifying command executed
+                when container is started and to which the run arguments are passed. If
+                :code:`None` (the default) then the default entrypoint for the image
+                will be used, otherwise the command specified by this argument will be
+                used.
             num_omp_threads: Value to set OMP_NUM_THREADS environment variable
                 specifying number of OpenMP threads to use, in local environment that
                 solver is executed.
@@ -293,6 +299,7 @@ class DockerModel(AbstractModel):
         self._image_name = image_name
         self._container_setup_commands = container_setup_commands
         self._container_mount_path = container_mount_path
+        self._container_entry_point = container_entry_point
 
     def _run_model(
         self,
@@ -325,11 +332,16 @@ class DockerModel(AbstractModel):
             # cleaning up temporary directory.
             f"chown -R {os.getuid()}:{os.getgid()} {container_mount_path}",
         ]
+        entrypoint_argument = (
+            ""
+            if self._container_entry_point is None
+            else f"--entrypoint {self._container_entry_point}"
+        )
         docker_command = (
             f"docker run --rm "
             f"-v {temporary_directory_path}:{container_mount_path}:rw  "
-            f"-w {container_mount_path} "
-            f"{self._image_name} /bin/bash -c '{'; '.join(container_commands)}'"
+            f"-w {container_mount_path} {entrypoint_argument}"
+            f"{self._image_name} /bin/bash -c '{' && '.join(container_commands)}'"
         )
         return subprocess.run(
             docker_command,
