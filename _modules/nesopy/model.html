@@ -71,10 +71,12 @@
   <h1>Source code for nesopy.model</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;Wrappers for NESO models.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">asyncio</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">shutil</span>
 <span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">tempfile</span>
 <span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
 <span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Sequence</span>
@@ -85,10 +87,42 @@
 
 <span class="n">ParametersDict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span><span class="p">]</span>
 <span class="n">ExtractOutputsFunction</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
-    <span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">,</span> <span class="n">ParametersDict</span><span class="p">],</span>
+    <span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span> <span class="o">|</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">Process</span><span class="p">,</span> <span class="n">ParametersDict</span><span class="p">],</span>
     <span class="n">Any</span><span class="p">,</span>
 <span class="p">]</span>
 <span class="n">PathLike</span> <span class="o">=</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span>
+
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">_redirect_stream</span><span class="p">(</span><span class="n">input_stream</span><span class="p">,</span> <span class="n">output_stream</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Asynchronously redirect lines from input_stream to output_stream.&quot;&quot;&quot;</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">line</span> <span class="o">=</span> <span class="k">await</span> <span class="n">input_stream</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">line</span><span class="p">:</span>
+            <span class="n">output_stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">break</span>
+
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">_create_subprocess_with_redirected_streams</span><span class="p">(</span>
+    <span class="n">cmd</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">cwd</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">env</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">Process</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a subprocess with stdout &amp; stderr redirected to parent process streams.&quot;&quot;&quot;</span>
+    <span class="n">process</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_subprocess_shell</span><span class="p">(</span>
+        <span class="n">cmd</span><span class="o">=</span><span class="n">cmd</span><span class="p">,</span>
+        <span class="n">stdout</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+        <span class="n">stderr</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+        <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span>
+        <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span>
+        <span class="n">_redirect_stream</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">),</span>
+        <span class="n">_redirect_stream</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">await</span> <span class="n">process</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">process</span>
 
 
 <div class="viewcode-block" id="AbstractModel"><a class="viewcode-back" href="../../nesopy.html#nesopy.model.AbstractModel">[docs]</a><span class="k">class</span> <span class="nc">AbstractModel</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
@@ -104,6 +138,7 @@
         <span class="n">num_omp_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">num_mpi_processes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">mpirun_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">redirect_subprocess_streams</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a new NESO model wrapper instance.</span>
 
@@ -117,9 +152,10 @@
 <span class="sd">            extract_outputs_function: Function to extract required outputs from model.</span>
 <span class="sd">                This function is passed the path to the temporary directory any outputs</span>
 <span class="sd">                from solver executable are written to, the `subprocess.CompletedProcess`</span>
-<span class="sd">                object returned by the `subprocess.run` call which captures any output</span>
-<span class="sd">                to the `stdout` and `stderr` streams as well as the exit status of the</span>
-<span class="sd">                command (which may be useful for checking that the model run executed</span>
+<span class="sd">                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`</span>
+<span class="sd">                (if `redirect_subprocess_streams=True`) object returned by the</span>
+<span class="sd">                subprocess used to execute the model run (which has a `returncode`</span>
+<span class="sd">                attribute may be useful for checking that the model run executed</span>
 <span class="sd">                successfully before loading outputs) and a dictionary of all of the</span>
 <span class="sd">                parameter values in the session file used to run the model. The return</span>
 <span class="sd">                value of this function is returned when calling the model.</span>
@@ -135,6 +171,14 @@
 <span class="sd">                of processes.</span>
 <span class="sd">            mpirun_options: Any additional optional arguments to pass to `mpirun`</span>
 <span class="sd">                command (only used when `num_mpi_processes &gt; 1`).</span>
+<span class="sd">            redirect_subprocess_streams: Whether to redirect the `stdout` and `stderr`</span>
+<span class="sd">                output streams of the subprocess used to run the model in to the</span>
+<span class="sd">                corresponding output streams of the output process. Enabling this</span>
+<span class="sd">                redirection can be useful for getting live output from the model while</span>
+<span class="sd">                it is running. If set to `False` the completed process object passed to</span>
+<span class="sd">                the `extract_outputs` function has string `stdout` and `stderr`</span>
+<span class="sd">                attributes which can be used to access any text written to the output</span>
+<span class="sd">                streams after the model run subprocess has completed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_solver_executable_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">solver_executable_path</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_mesh_file_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">mesh_file_path</span><span class="p">)</span>
@@ -142,7 +186,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_extract_outputs_function</span> <span class="o">=</span> <span class="n">extract_outputs_function</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_num_omp_threads</span> <span class="o">=</span> <span class="n">num_omp_threads</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_num_mpi_processes</span> <span class="o">=</span> <span class="n">num_mpi_processes</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_mpirun_options</span> <span class="o">=</span> <span class="n">mpirun_options</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mpirun_options</span> <span class="o">=</span> <span class="n">mpirun_options</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_redirect_subprocess_streams</span> <span class="o">=</span> <span class="n">redirect_subprocess_streams</span></div>
 
     <span class="k">def</span> <span class="nf">_write_session_file_and_read_parameters</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -198,12 +243,36 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">base_command</span>
 
+    <span class="k">def</span> <span class="nf">_run_subprocess</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">cmd</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">cwd</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">env</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span> <span class="o">|</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">Process</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_redirect_subprocess_streams</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="n">_create_subprocess_with_redirected_streams</span><span class="p">(</span>
+                    <span class="n">cmd</span><span class="o">=</span><span class="n">cmd</span><span class="p">,</span>
+                    <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span>
+                    <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="n">cmd</span><span class="p">,</span>
+                <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span>
+                <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span>
+                <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># noqa: S602</span>
+                <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span> <span class="nf">_run_model</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">session_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
         <span class="n">temporary_directory_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span> <span class="o">|</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">Process</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Run model with specified session file outputting to temporary directory.</span>
 
 <span class="sd">        Args:</span>
@@ -261,9 +330,10 @@
 <span class="sd">            extract_outputs_function: Function to extract required outputs from model.</span>
 <span class="sd">                This function is passed the path to the temporary directory any outputs</span>
 <span class="sd">                from solver executable are written to, the `subprocess.CompletedProcess`</span>
-<span class="sd">                object returned by the `subprocess.run` call which captures any output</span>
-<span class="sd">                to the `stdout` and `stderr` streams as well as the exit status of the</span>
-<span class="sd">                command (which may be useful for checking that the model run executed</span>
+<span class="sd">                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`</span>
+<span class="sd">                (if `redirect_subprocess_streams=True`) object returned by the</span>
+<span class="sd">                subprocess used to execute the model run (which has a `returncode`</span>
+<span class="sd">                attribute may be useful for checking that the model run executed</span>
 <span class="sd">                successfully before loading outputs) and a dictionary of all of the</span>
 <span class="sd">                parameter values in the session file used to run the model. The return</span>
 <span class="sd">                value of this function is returned when calling the model.</span>
@@ -279,6 +349,14 @@
 <span class="sd">                of processes.</span>
 <span class="sd">            mpi_run_options: Any additional optional arguments to pass to `mpirun`</span>
 <span class="sd">                command (only used when `num_mpi_processes &gt; 1`).</span>
+<span class="sd">            redirect_subprocess_streams: Whether to redirect the `stdout` and `stderr`</span>
+<span class="sd">                output streams of the subprocess used to run the model in to the</span>
+<span class="sd">                corresponding output streams of the output process. Enabling this</span>
+<span class="sd">                redirection can be useful for getting live output from the model while</span>
+<span class="sd">                it is running. If set to `False` the completed process object passed to</span>
+<span class="sd">                the `extract_outputs` function has string `stdout` and `stderr`</span>
+<span class="sd">                attributes which can be used to access any text written to the output</span>
+<span class="sd">                streams after the model run subprocess has completed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">path_attribute</span> <span class="ow">in</span> <span class="p">(</span>
@@ -296,16 +374,14 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">session_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
         <span class="n">temporary_directory_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span> <span class="o">|</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">Process</span><span class="p">:</span>
         <span class="n">run_command</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_run_command</span><span class="p">(</span>
             <span class="n">session_file_path</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_mesh_file_path</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_subprocess</span><span class="p">(</span>
             <span class="n">run_command</span><span class="p">,</span>
-            <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># noqa: S602</span>
             <span class="n">cwd</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">temporary_directory_path</span><span class="p">),</span>
-            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="n">env</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="o">|</span> <span class="p">{</span><span class="s2">&quot;OMP_NUM_THREADS&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_omp_threads</span><span class="p">)},</span>
         <span class="p">)</span></div>
 
@@ -335,9 +411,10 @@
 <span class="sd">            extract_outputs_function: Function to extract required outputs from model.</span>
 <span class="sd">                This function is passed the path to the temporary directory any outputs</span>
 <span class="sd">                from solver executable are written to, the `subprocess.CompletedProcess`</span>
-<span class="sd">                object returned by the `subprocess.run` call which captures any output</span>
-<span class="sd">                to the `stdout` and `stderr` streams as well as the exit status of the</span>
-<span class="sd">                command (which may be useful for checking that the model run executed</span>
+<span class="sd">                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`</span>
+<span class="sd">                (if `redirect_subprocess_streams=True`) object returned by the</span>
+<span class="sd">                subprocess used to execute the model run (which has a `returncode`</span>
+<span class="sd">                attribute may be useful for checking that the model run executed</span>
 <span class="sd">                successfully before loading outputs) and a dictionary of all of the</span>
 <span class="sd">                parameter values in the session file used to run the model. The return</span>
 <span class="sd">                value of this function is returned when calling the model.</span>
@@ -365,6 +442,14 @@
 <span class="sd">                of processes.</span>
 <span class="sd">            mpi_run_options: Any additional optional arguments to pass to `mpirun`</span>
 <span class="sd">                command (only used when `num_mpi_processes &gt; 1`).</span>
+<span class="sd">            redirect_subprocess_streams: Whether to redirect the `stdout` and `stderr`</span>
+<span class="sd">                output streams of the subprocess used to run the model in to the</span>
+<span class="sd">                corresponding output streams of the output process. Enabling this</span>
+<span class="sd">                redirection can be useful for getting live output from the model while</span>
+<span class="sd">                it is running. If set to `False` the completed process object passed to</span>
+<span class="sd">                the `extract_outputs` function has string `stdout` and `stderr`</span>
+<span class="sd">                attributes which can be used to access any text written to the output</span>
+<span class="sd">                streams after the model run subprocess has completed.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_image_name</span> <span class="o">=</span> <span class="n">image_name</span>
@@ -376,7 +461,7 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">session_file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
         <span class="n">temporary_directory_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span> <span class="o">|</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">Process</span><span class="p">:</span>
         <span class="c1"># Ensure copies of session and mesh files in temporary directory that container</span>
         <span class="c1"># will have access to.</span>
         <span class="k">if</span> <span class="n">session_file_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">!=</span> <span class="n">temporary_directory_path</span><span class="p">:</span>
@@ -414,12 +499,7 @@
             <span class="sa">f</span><span class="s2">&quot;-w </span><span class="si">{</span><span class="n">container_mount_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">entrypoint_argument</span><span class="si">}</span><span class="s2">&quot;</span>
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_image_name</span><span class="si">}</span><span class="s2"> /bin/bash -c &#39;</span><span class="si">{</span><span class="s1">&#39; &amp;&amp; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">container_commands</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-            <span class="n">docker_command</span><span class="p">,</span>
-            <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># noqa: S602</span>
-            <span class="n">cwd</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">temporary_directory_path</span><span class="p">),</span>
-            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_subprocess</span><span class="p">(</span><span class="n">docker_command</span><span class="p">,</span> <span class="n">cwd</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">temporary_directory_path</span><span class="p">))</span></div>
 </pre></div>
 
            </div>
