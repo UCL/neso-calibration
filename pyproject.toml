@@ -18,6 +18,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "aiofiles",
     "h5py",
     "numpy",
 ]

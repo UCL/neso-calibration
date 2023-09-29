@@ -4,54 +4,47 @@ import asyncio
 import os
 import re
 import shutil
-import subprocess
 import sys
-import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import parse as xml_parse
 
+import aiofiles
+
+
+class ProcessOutput(NamedTuple):
+    """Output data from process."""
+
+    return_code: int | None
+    stdout: bytes
+    stderr: bytes
+
+
 ParametersDict = dict[str, float | int]
 ExtractOutputsFunction = Callable[
-    [Path, subprocess.CompletedProcess | asyncio.subprocess.Process, ParametersDict],
+    [Path, ProcessOutput, ParametersDict],
     Any,
 ]
 PathLike = str | Path
 
 
-async def _redirect_stream(input_stream, output_stream):
-    """Asynchronously redirect lines from input_stream to output_stream."""
+async def _redirect_stream(input_stream, output_stream) -> bytes:
+    """Asynchronously redirect lines from input_stream to output_stream.
+
+    Also returns concatenated output.
+    """
+    output = b""
     while True:
         line = await input_stream.readline()
         if line:
+            output += line
             output_stream.write(line.decode())
         else:
             break
-
-
-async def _create_subprocess_with_redirected_streams(
-    cmd: str,
-    *,
-    cwd: str | None,
-    env: dict[str, str] | None,
-) -> asyncio.subprocess.Process:
-    """Create a subprocess with stdout & stderr redirected to parent process streams."""
-    process = await asyncio.create_subprocess_shell(
-        cmd=cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=cwd,
-        env=env,
-    )
-    await asyncio.gather(
-        _redirect_stream(process.stdout, sys.stdout),
-        _redirect_stream(process.stderr, sys.stderr),
-    )
-    await process.wait()
-    return process
+    return output
 
 
 class AbstractModel(ABC):
@@ -80,14 +73,11 @@ class AbstractModel(ABC):
             mesh_file_path: Path to XML file defining spatial mesh to solve on.
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
-                from solver executable are written to, the `subprocess.CompletedProcess`
-                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
-                (if `redirect_subprocess_streams=True`) object returned by the
-                subprocess used to execute the model run (which has a `returncode`
-                attribute may be useful for checking that the model run executed
-                successfully before loading outputs) and a dictionary of all of the
-                parameter values in the session file used to run the model. The return
-                value of this function is returned when calling the model.
+                from solver executable are written to, a `ProcessOutput` tuple with
+                return code and captured `stdout` and `stderr` outputs from subprocess
+                used to execute the model run and a dictionary of all of the parameter
+                values in the session file used to run the model. The return value of
+                this function is returned when calling the model.
 
         Keyword Args:
             num_omp_threads: Value to set OMP_NUM_THREADS environment variable
@@ -172,36 +162,36 @@ class AbstractModel(ABC):
         else:
             return base_command
 
-    def _run_subprocess(
+    async def _create_subprocess(
         self,
         cmd: str,
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
+        process = await asyncio.create_subprocess_shell(
+            cmd=cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+            env=env,
+        )
         if self._redirect_subprocess_streams:
-            return asyncio.run(
-                _create_subprocess_with_redirected_streams(
-                    cmd=cmd,
-                    cwd=cwd,
-                    env=env,
-                ),
+            stdout, stderr = await asyncio.gather(
+                _redirect_stream(process.stdout, sys.stdout),
+                _redirect_stream(process.stderr, sys.stderr),
             )
+            await process.wait()
         else:
-            return subprocess.run(
-                cmd,
-                cwd=cwd,
-                env=env,
-                shell=True,  # noqa: S602
-                capture_output=True,
-            )
+            stdout, stderr = await process.communicate()
+        return ProcessOutput(process.returncode, stdout, stderr)
 
     @abstractmethod
-    def _run_model(
+    async def _run_model_subprocess(
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
         """Run model with specified session file outputting to temporary directory.
 
         Args:
@@ -210,12 +200,11 @@ class AbstractModel(ABC):
                 written.
 
         Returns:
-            Completed process object with any captured output from model execution.
+            Tuple of return code and captured output of subprocess used for model run.
         """
 
-    def __call__(self, **parameter_overrides: float | int):
-        """
-        Simulate model and return extracted outputs with specified parameter overrides.
+    async def __call__(self, **parameter_overrides: float | int):
+        """Asynchronously run model with specified parameter overrides.
 
         Keyword Args:
             parameter_overrides: Values to override default parameters in session file
@@ -225,20 +214,20 @@ class AbstractModel(ABC):
             Outputs returned by `extract_outputs` function specified when constructing
             model instance.
         """
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        async with aiofiles.tempfile.TemporaryDirectory() as temporary_directory:
             temporary_directory_path = Path(temporary_directory)
             session_file_path = temporary_directory_path / "session.xml"
             parameter_values = self._write_session_file_and_read_parameters(
                 session_file_path,
                 **parameter_overrides,
             )
-            completed_process = self._run_model(
+            process_output = await self._run_model_subprocess(
                 session_file_path,
                 temporary_directory_path,
             )
             return self._extract_outputs_function(
                 temporary_directory_path,
-                completed_process,
+                process_output,
                 parameter_values,
             )
 
@@ -258,14 +247,11 @@ class NativeModel(AbstractModel):
             mesh_file_path: Path to XML file defining spatial mesh to solve on.
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
-                from solver executable are written to, the `subprocess.CompletedProcess`
-                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
-                (if `redirect_subprocess_streams=True`) object returned by the
-                subprocess used to execute the model run (which has a `returncode`
-                attribute may be useful for checking that the model run executed
-                successfully before loading outputs) and a dictionary of all of the
-                parameter values in the session file used to run the model. The return
-                value of this function is returned when calling the model.
+                from solver executable are written to, a `ProcessOutput` tuple with
+                return code and captured `stdout` and `stderr` outputs from subprocess
+                used to execute the model run and a dictionary of all of the parameter
+                values in the session file used to run the model. The return value of
+                this function is returned when calling the model.
 
         Keyword Args:
             num_omp_threads: Value to set OMP_NUM_THREADS environment variable
@@ -299,16 +285,16 @@ class NativeModel(AbstractModel):
                 msg = f"No file exists at {path_attribute} = {path}"
                 raise ValueError(msg)
 
-    def _run_model(
+    async def _run_model_subprocess(
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
         run_command = self._construct_run_command(
             session_file_path,
             self._mesh_file_path,
         )
-        return self._run_subprocess(
+        return await self._create_subprocess(
             run_command,
             cwd=str(temporary_directory_path),
             env=os.environ | {"OMP_NUM_THREADS": str(self._num_omp_threads)},
@@ -339,14 +325,11 @@ class DockerModel(AbstractModel):
             mesh_file_path: Path to XML file defining spatial mesh to solve on.
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
-                from solver executable are written to, the `subprocess.CompletedProcess`
-                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
-                (if `redirect_subprocess_streams=True`) object returned by the
-                subprocess used to execute the model run (which has a `returncode`
-                attribute may be useful for checking that the model run executed
-                successfully before loading outputs) and a dictionary of all of the
-                parameter values in the session file used to run the model. The return
-                value of this function is returned when calling the model.
+                from solver executable are written to, a `ProcessOutput` tuple with
+                return code and captured `stdout` and `stderr` outputs from subprocess
+                used to execute the model run and a dictionary of all of the parameter
+                values in the session file used to run the model. The return value of
+                this function is returned when calling the model.
 
         Keyword Args:
             container_setup_commands: Any commands to execute in Docker container shell
@@ -386,11 +369,11 @@ class DockerModel(AbstractModel):
         self._container_mount_path = container_mount_path
         self._container_entry_point = container_entry_point
 
-    def _run_model(
+    async def _run_model_subprocess(
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
         # Ensure copies of session and mesh files in temporary directory that container
         # will have access to.
         if session_file_path.parent != temporary_directory_path:
@@ -428,4 +411,7 @@ class DockerModel(AbstractModel):
             f"-w {container_mount_path} {entrypoint_argument}"
             f"{self._image_name} /bin/bash -c '{' && '.join(container_commands)}'"
         )
-        return self._run_subprocess(docker_command, cwd=str(temporary_directory_path))
+        return await self._create_subprocess(
+            docker_command,
+            cwd=str(temporary_directory_path),
+        )
