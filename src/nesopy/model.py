@@ -235,7 +235,13 @@ class AbstractModel(ABC):
 class NativeModel(AbstractModel):
     """NESO model using solver installed natively on local filesystem."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        environment_variables: dict[str, str] | None = None,
+        setup_commands: Sequence[str] = (),
+        **kwargs,
+    ):
         """Create a new native NESO model wrapper instance.
 
         Args:
@@ -254,6 +260,11 @@ class NativeModel(AbstractModel):
                 this function is returned when calling the model.
 
         Keyword Args:
+            environment_variables: Any additional environment variables to set in
+                subprocess used to execute solver.
+            setup_commands: Any commands to execute in subprocess used to execute solver
+                before executing solver command (for example to setup environment), as a
+                sequence of strings.
             num_omp_threads: Value to set OMP_NUM_THREADS environment variable
                 specifying number of OpenMP threads to use, in local environment that
                 solver is executed.
@@ -274,6 +285,10 @@ class NativeModel(AbstractModel):
                 streams after the model run subprocess has completed.
         """
         super().__init__(*args, **kwargs)
+        self._environment_variables = (
+            {} if environment_variables is None else environment_variables
+        )
+        self._setup_commands = tuple(setup_commands)
         for path_attribute in (
             "solver_executable_path",
             "mesh_file_path",
@@ -295,9 +310,11 @@ class NativeModel(AbstractModel):
             self._mesh_file_path,
         )
         return await self._create_subprocess(
-            run_command,
+            " && ".join((*self._setup_commands, run_command)),
             cwd=str(temporary_directory_path),
-            env=os.environ | {"OMP_NUM_THREADS": str(self._num_omp_threads)},
+            env=os.environ
+            | {"OMP_NUM_THREADS": str(self._num_omp_threads)}
+            | self._environment_variables,
         )
 
 
