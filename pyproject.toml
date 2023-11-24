@@ -15,6 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
 ]
 dependencies = [
@@ -22,7 +23,7 @@ dependencies = [
     "h5py",
     "numpy",
 ]
-description = "A cookieninja template with ARC recommendations."
+description = "Python wrappers for Neptune Exploratory Software (NESO) models."
 dynamic = [
     "version",
 ]
