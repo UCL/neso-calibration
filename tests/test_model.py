@@ -1,5 +1,7 @@
 """Tests for model module."""
 
+import asyncio
+
 import pytest
 
 import nesopy.model
@@ -88,6 +90,6 @@ def test_native_model(tmp_path, base_parameters, parameter_overrides):
         extract_outputs_function=_dummy_extract_outputs,
     )
 
-    completed_process, parameters = model(**parameter_overrides)
+    completed_process, parameters = asyncio.run(model(**parameter_overrides))
     assert parameters == (base_parameters | parameter_overrides)
     assert DUMMY_MESH_FILE_CONTENTS in completed_process.stdout.decode("utf-8")
