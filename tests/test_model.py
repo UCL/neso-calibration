@@ -84,7 +84,7 @@ def test_native_model(tmp_path, base_parameters, parameter_overrides):
         return completed_process, parameters
 
     model = nesopy.model.NativeModel(
-        solver_executable_path=executable_path,
+        solver_executable=executable_path,
         base_session_file_path=base_session_file_path,
         mesh_file_path=mesh_file_path,
         extract_outputs_function=_dummy_extract_outputs,

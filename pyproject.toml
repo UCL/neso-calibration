@@ -131,7 +131,7 @@ pep8-naming.classmethod-decorators = [
     "pydantic.validator",
 ]
 pydocstyle.convention = "google"
-pylint.max-args = 10
+pylint.max-args = 20
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
