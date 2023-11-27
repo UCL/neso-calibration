@@ -120,7 +120,7 @@ class AbstractModel(ABC):
             {} if environment_variables is None else environment_variables
         )
         self._setup_commands = tuple(setup_commands)
-        self._environment_variables["NUM_OMP_THREADS"] = str(num_omp_threads)
+        self._environment_variables["OMP_NUM_THREADS"] = str(num_omp_threads)
         self._num_mpi_processes = num_mpi_processes
         self._mpirun_options = mpirun_options
         self._redirect_subprocess_streams = redirect_subprocess_streams
