@@ -4,54 +4,47 @@ import asyncio
 import os
 import re
 import shutil
-import subprocess
 import sys
-import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import parse as xml_parse
 
+import aiofiles
+
+
+class ProcessOutput(NamedTuple):
+    """Output data from process."""
+
+    return_code: int | None
+    stdout: bytes
+    stderr: bytes
+
+
 ParametersDict = dict[str, float | int]
 ExtractOutputsFunction = Callable[
-    [Path, subprocess.CompletedProcess | asyncio.subprocess.Process, ParametersDict],
+    [Path, ProcessOutput, ParametersDict],
     Any,
 ]
 PathLike = str | Path
 
 
-async def _redirect_stream(input_stream, output_stream):
-    """Asynchronously redirect lines from input_stream to output_stream."""
+async def _redirect_stream(input_stream, output_stream) -> bytes:
+    """Asynchronously redirect lines from input_stream to output_stream.
+
+    Also returns concatenated output.
+    """
+    output = b""
     while True:
         line = await input_stream.readline()
         if line:
+            output += line
             output_stream.write(line.decode())
         else:
             break
-
-
-async def _create_subprocess_with_redirected_streams(
-    cmd: str,
-    *,
-    cwd: str | None,
-    env: dict[str, str] | None,
-) -> asyncio.subprocess.Process:
-    """Create a subprocess with stdout & stderr redirected to parent process streams."""
-    process = await asyncio.create_subprocess_shell(
-        cmd=cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=cwd,
-        env=env,
-    )
-    await asyncio.gather(
-        _redirect_stream(process.stdout, sys.stdout),
-        _redirect_stream(process.stderr, sys.stderr),
-    )
-    await process.wait()
-    return process
+    return output
 
 
 class AbstractModel(ABC):
@@ -59,11 +52,13 @@ class AbstractModel(ABC):
 
     def __init__(
         self,
-        solver_executable_path: PathLike,
+        solver_executable: PathLike,
         base_session_file_path: PathLike,
         mesh_file_path: PathLike,
         extract_outputs_function: ExtractOutputsFunction,
         *,
+        environment_variables: dict[str, str] | None = None,
+        setup_commands: Sequence[str] = (),
         num_omp_threads: int = 1,
         num_mpi_processes: int = 1,
         mpirun_options: str = "",
@@ -72,7 +67,9 @@ class AbstractModel(ABC):
         """Create a new NESO model wrapper instance.
 
         Args:
-            solver_executable_path: Path to NESO solver executable to use.
+            solver_executable: NESO solver executable to use. If the solver executable
+                is on the current search path then the solver name can be used directly,
+                otherwise a path to the executable should be provided.
             base_session_file_path: Path to XML file defining bae NESO configuration.
                 Parameters values defined in this file are used as defaults unless
                 overridden by `parameter_overrides` keyword arguments when calling
@@ -80,16 +77,18 @@ class AbstractModel(ABC):
             mesh_file_path: Path to XML file defining spatial mesh to solve on.
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
-                from solver executable are written to, the `subprocess.CompletedProcess`
-                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
-                (if `redirect_subprocess_streams=True`) object returned by the
-                subprocess used to execute the model run (which has a `returncode`
-                attribute may be useful for checking that the model run executed
-                successfully before loading outputs) and a dictionary of all of the
-                parameter values in the session file used to run the model. The return
-                value of this function is returned when calling the model.
+                from solver executable are written to, a `ProcessOutput` tuple with
+                return code and captured `stdout` and `stderr` outputs from subprocess
+                used to execute the model run and a dictionary of all of the parameter
+                values in the session file used to run the model. The return value of
+                this function is returned when calling the model.
 
         Keyword Args:
+            environment_variables: Any additional environment variables to set in
+                environment used to execute solver.
+            setup_commands: Any commands to execute in environment used to execute
+                solver before executing solver command (for example to setup
+                environment), as a sequence of strings.
             num_omp_threads: Value to set OMP_NUM_THREADS environment variable
                 specifying number of OpenMP threads to use, in local environment that
                 solver is executed.
@@ -109,11 +108,19 @@ class AbstractModel(ABC):
                 attributes which can be used to access any text written to the output
                 streams after the model run subprocess has completed.
         """
-        self._solver_executable_path = Path(solver_executable_path)
-        self._mesh_file_path = Path(mesh_file_path)
-        self._base_session_file_path = Path(base_session_file_path)
+        self._solver_executable = solver_executable
+        for path in (mesh_file_path, base_session_file_path):
+            if not Path(path).exists():
+                msg = f"No file exists at {path}"
+                raise FileNotFoundError(msg)
+        self._mesh_file_path = Path(mesh_file_path).resolve()
+        self._base_session_file_path = Path(base_session_file_path).resolve()
         self._extract_outputs_function = extract_outputs_function
-        self._num_omp_threads = num_omp_threads
+        self._environment_variables = (
+            {} if environment_variables is None else environment_variables
+        )
+        self._setup_commands = tuple(setup_commands)
+        self._environment_variables["OMP_NUM_THREADS"] = str(num_omp_threads)
         self._num_mpi_processes = num_mpi_processes
         self._mpirun_options = mpirun_options
         self._redirect_subprocess_streams = redirect_subprocess_streams
@@ -163,45 +170,43 @@ class AbstractModel(ABC):
         session_file_path: PathLike,
         mesh_file_path: PathLike,
     ) -> str:
-        base_command = (
-            f"{self._solver_executable_path} {session_file_path} {mesh_file_path}"
-        )
+        base_command = f"{self._solver_executable} {session_file_path} {mesh_file_path}"
         if self._num_mpi_processes > 1:
             mpi_command = f"mpirun -n {self._num_mpi_processes} {self._mpirun_options}"
             return f"{mpi_command} {base_command}"
         else:
             return base_command
 
-    def _run_subprocess(
+    async def _create_subprocess(
         self,
         cmd: str,
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
+        process = await asyncio.create_subprocess_shell(
+            cmd=cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+            env=env,
+        )
         if self._redirect_subprocess_streams:
-            return asyncio.run(
-                _create_subprocess_with_redirected_streams(
-                    cmd=cmd,
-                    cwd=cwd,
-                    env=env,
-                ),
+            stdout, stderr = await asyncio.gather(
+                _redirect_stream(process.stdout, sys.stdout),
+                _redirect_stream(process.stderr, sys.stderr),
             )
+            await process.wait()
         else:
-            return subprocess.run(
-                cmd,
-                cwd=cwd,
-                env=env,
-                shell=True,  # noqa: S602
-                capture_output=True,
-            )
+            stdout, stderr = await process.communicate()
+        return ProcessOutput(process.returncode, stdout, stderr)
 
     @abstractmethod
-    def _run_model(
+    async def _run_model_subprocess(
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
         """Run model with specified session file outputting to temporary directory.
 
         Args:
@@ -210,12 +215,11 @@ class AbstractModel(ABC):
                 written.
 
         Returns:
-            Completed process object with any captured output from model execution.
+            Tuple of return code and captured output of subprocess used for model run.
         """
 
-    def __call__(self, **parameter_overrides: float | int):
-        """
-        Simulate model and return extracted outputs with specified parameter overrides.
+    async def __call__(self, **parameter_overrides: float | int):
+        """Asynchronously run model with specified parameter overrides.
 
         Keyword Args:
             parameter_overrides: Values to override default parameters in session file
@@ -225,20 +229,20 @@ class AbstractModel(ABC):
             Outputs returned by `extract_outputs` function specified when constructing
             model instance.
         """
-        with tempfile.TemporaryDirectory() as temporary_directory:
+        async with aiofiles.tempfile.TemporaryDirectory() as temporary_directory:
             temporary_directory_path = Path(temporary_directory)
             session_file_path = temporary_directory_path / "session.xml"
             parameter_values = self._write_session_file_and_read_parameters(
                 session_file_path,
                 **parameter_overrides,
             )
-            completed_process = self._run_model(
+            process_output = await self._run_model_subprocess(
                 session_file_path,
                 temporary_directory_path,
             )
             return self._extract_outputs_function(
                 temporary_directory_path,
-                completed_process,
+                process_output,
                 parameter_values,
             )
 
@@ -246,72 +250,19 @@ class AbstractModel(ABC):
 class NativeModel(AbstractModel):
     """NESO model using solver installed natively on local filesystem."""
 
-    def __init__(self, *args, **kwargs):
-        """Create a new native NESO model wrapper instance.
-
-        Args:
-            solver_executable_path: Path to NESO solver executable to use.
-            base_session_file_path: Path to XML file defining bae NESO configuration.
-                Parameters values defined in this file are used as defaults unless
-                overridden by `parameter_overrides` keyword arguments when calling
-                model.
-            mesh_file_path: Path to XML file defining spatial mesh to solve on.
-            extract_outputs_function: Function to extract required outputs from model.
-                This function is passed the path to the temporary directory any outputs
-                from solver executable are written to, the `subprocess.CompletedProcess`
-                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
-                (if `redirect_subprocess_streams=True`) object returned by the
-                subprocess used to execute the model run (which has a `returncode`
-                attribute may be useful for checking that the model run executed
-                successfully before loading outputs) and a dictionary of all of the
-                parameter values in the session file used to run the model. The return
-                value of this function is returned when calling the model.
-
-        Keyword Args:
-            num_omp_threads: Value to set OMP_NUM_THREADS environment variable
-                specifying number of OpenMP threads to use, in local environment that
-                solver is executed.
-            num_mpi_processes: Number of message passing interface (MPI) processes to
-                run solver executable with. If set to 1 (the default) solver exectuable
-                is run directly if set to greater than 1 then solver exectuable
-                command is passed to `mpirun` with `-n` argument set to specified number
-                of processes.
-            mpi_run_options: Any additional optional arguments to pass to `mpirun`
-                command (only used when `num_mpi_processes > 1`).
-            redirect_subprocess_streams: Whether to redirect the `stdout` and `stderr`
-                output streams of the subprocess used to run the model in to the
-                corresponding output streams of the output process. Enabling this
-                redirection can be useful for getting live output from the model while
-                it is running. If set to `False` the completed process object passed to
-                the `extract_outputs` function has string `stdout` and `stderr`
-                attributes which can be used to access any text written to the output
-                streams after the model run subprocess has completed.
-        """
-        super().__init__(*args, **kwargs)
-        for path_attribute in (
-            "solver_executable_path",
-            "mesh_file_path",
-            "base_session_file_path",
-        ):
-            path = getattr(self, f"_{path_attribute}")
-            setattr(self, f"_{path_attribute}", path.resolve())
-            if not path.exists():
-                msg = f"No file exists at {path_attribute} = {path}"
-                raise ValueError(msg)
-
-    def _run_model(
+    async def _run_model_subprocess(
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
         run_command = self._construct_run_command(
             session_file_path,
             self._mesh_file_path,
         )
-        return self._run_subprocess(
-            run_command,
+        return await self._create_subprocess(
+            " && ".join((*self._setup_commands, run_command)),
             cwd=str(temporary_directory_path),
-            env=os.environ | {"OMP_NUM_THREADS": str(self._num_omp_threads)},
+            env=os.environ | self._environment_variables,
         )
 
 
@@ -321,37 +272,48 @@ class DockerModel(AbstractModel):
     def __init__(
         self,
         image_name: str,
-        *args,
-        container_setup_commands: Sequence[str] = (),
+        solver_executable: PathLike,
+        base_session_file_path: PathLike,
+        mesh_file_path: PathLike,
+        extract_outputs_function: ExtractOutputsFunction,
+        *,
+        setup_commands: Sequence[str] = (),
+        environment_variables: dict[str, str] | None = None,
         container_mount_path: PathLike = "/output",
         container_entry_point: str | None = None,
-        **kwargs,
+        num_omp_threads: int = 1,
+        num_mpi_processes: int = 1,
+        mpirun_options: str = "",
+        redirect_subprocess_streams: bool = False,
     ):
         """Create a new Docker based NESO model wrapper instance.
 
         Args:
             image_name: Name of Docker image in which NESO solvers are installed.
-            solver_executable_path: Path to NESO solver executable to use.
-            base_session_file_path: Path to XML file defining base NESO configuration.
-                Parameters values defined in this file are used as defaults unless
-                overridden by `parameter_overrides` keyword arguments when calling
-                model.
-            mesh_file_path: Path to XML file defining spatial mesh to solve on.
+            solver_executable: NESO solver executable to use. If the solver executable
+                is on the current search path (on the Docker image) then the solver name
+                can be used directly, otherwise a path to the executable on the
+                container file system should be provided.
+            base_session_file_path: Path to XML file defining base NESO configuration,
+                on local file system. Parameters values defined in this file are used as
+                defaults unless overridden by `parameter_overrides` keyword arguments
+                when calling model.
+            mesh_file_path: Path to XML file defining spatial mesh to solve on, on local
+                file system.
             extract_outputs_function: Function to extract required outputs from model.
                 This function is passed the path to the temporary directory any outputs
-                from solver executable are written to, the `subprocess.CompletedProcess`
-                (if `redirect_subprocess_streams=False`) or `asyncio.subprocess.Process`
-                (if `redirect_subprocess_streams=True`) object returned by the
-                subprocess used to execute the model run (which has a `returncode`
-                attribute may be useful for checking that the model run executed
-                successfully before loading outputs) and a dictionary of all of the
-                parameter values in the session file used to run the model. The return
-                value of this function is returned when calling the model.
+                from solver executable are written to, a `ProcessOutput` tuple with
+                return code and captured `stdout` and `stderr` outputs from subprocess
+                used to execute the model run and a dictionary of all of the parameter
+                values in the session file used to run the model. The return value of
+                this function is returned when calling the model.
 
         Keyword Args:
-            container_setup_commands: Any commands to execute in Docker container shell
-                before executing solver command (for example to setup environment within
+            setup_commands: Any commands to execute in Docker container shell before
+                executing solver command (for example to setup environment within
                 container), as a sequence of strings.
+            environment_variables: Any additional environment variables to set in
+                container used to execute solver.
             container_mount_path: Path to bind mount on container the temporary
                 directory on local host system used for writing outputs to and as
                 working directory for solver executions. No directory or file should
@@ -380,17 +342,27 @@ class DockerModel(AbstractModel):
                 attributes which can be used to access any text written to the output
                 streams after the model run subprocess has completed.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            solver_executable=solver_executable,
+            base_session_file_path=base_session_file_path,
+            mesh_file_path=mesh_file_path,
+            extract_outputs_function=extract_outputs_function,
+            setup_commands=setup_commands,
+            environment_variables=environment_variables,
+            num_omp_threads=num_omp_threads,
+            num_mpi_processes=num_mpi_processes,
+            mpirun_options=mpirun_options,
+            redirect_subprocess_streams=redirect_subprocess_streams,
+        )
         self._image_name = image_name
-        self._container_setup_commands = container_setup_commands
         self._container_mount_path = container_mount_path
         self._container_entry_point = container_entry_point
 
-    def _run_model(
+    async def _run_model_subprocess(
         self,
         session_file_path: Path,
         temporary_directory_path: Path,
-    ) -> subprocess.CompletedProcess | asyncio.subprocess.Process:
+    ) -> ProcessOutput:
         # Ensure copies of session and mesh files in temporary directory that container
         # will have access to.
         if session_file_path.parent != temporary_directory_path:
@@ -409,8 +381,8 @@ class DockerModel(AbstractModel):
             container_mesh_file_path,
         )
         container_commands = [
-            *self._container_setup_commands,
-            f"export OMP_NUM_THREADS={self._num_omp_threads}",
+            *self._setup_commands,
+            *[f"export {k}={v}" for k, v in self._environment_variables.items()],
             run_command,
             # We need to change user and group owner for any files written by container
             # to match current user and group IDs to avoid file permission errors when
@@ -428,4 +400,7 @@ class DockerModel(AbstractModel):
             f"-w {container_mount_path} {entrypoint_argument}"
             f"{self._image_name} /bin/bash -c '{' && '.join(container_commands)}'"
         )
-        return self._run_subprocess(docker_command, cwd=str(temporary_directory_path))
+        return await self._create_subprocess(
+            docker_command,
+            cwd=str(temporary_directory_path),
+        )

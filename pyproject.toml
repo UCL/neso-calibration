@@ -15,13 +15,15 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
 ]
 dependencies = [
+    "aiofiles",
     "h5py",
     "numpy",
 ]
-description = "A cookieninja template with ARC recommendations."
+description = "Python wrappers for Neptune Exploratory Software (NESO) models."
 dynamic = [
     "version",
 ]
@@ -130,7 +132,7 @@ pep8-naming.classmethod-decorators = [
     "pydantic.validator",
 ]
 pydocstyle.convention = "google"
-pylint.max-args = 10
+pylint.max-args = 20
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
